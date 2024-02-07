@@ -306,6 +306,9 @@ ethers-solc = { git = "https://github.com/gakonst/ethers-rs", rev = "f0e5b194f09
 zaun-sandbox = { git = "https://github.com/keep-starknet-strange/zaun", package = "sandbox" }
 starknet-core-contract-client = { git = "https://github.com/keep-starknet-strange/zaun" }
 
+# Bonsai trie
+bonsai-trie = { default-features = false, git = "https://github.com/antiyro/bonsai-trie.git", branch = "oss" }
+
 # Other third party dependencies
 anyhow = "1.0.75"
 flate2 = "1.0.28"

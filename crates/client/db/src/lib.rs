@@ -15,6 +15,7 @@ mod error;
 pub use error::DbError;
 
 mod mapping_db;
+use kvdb::KeyValueDB;
 pub use mapping_db::MappingCommitment;
 use sierra_classes_db::SierraClassesDb;
 use starknet_api::hash::StarkHash;
@@ -23,12 +24,14 @@ mod db_opening_utils;
 mod messaging_db;
 mod sierra_classes_db;
 pub use messaging_db::LastSyncedEventBlock;
+mod bonsai_db;
 mod meta_db;
 
 use std::marker::PhantomData;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
+use bonsai_db::BonsaiDb;
 use da_db::DaDb;
 use mapping_db::MappingDb;
 use messaging_db::MessagingDb;
@@ -70,6 +73,9 @@ pub(crate) mod columns {
 
     /// This column contains the Sierra contract classes
     pub const SIERRA_CONTRACT_CLASSES: u32 = 7;
+
+    /// This column contains the bonsai trie keys
+    pub const BONSAI: u32 = 6;
 }
 
 pub mod static_keys {
@@ -80,15 +86,19 @@ pub mod static_keys {
 
 /// The Madara client database backend
 ///
-/// Contains two distinct databases: `meta` and `mapping`.
+/// Contains five distinct databases: `meta`, `mapping`, `messaging`, `da` and `bonsai``.
 /// `mapping` is used to map Starknet blocks to Substrate ones.
 /// `meta` is used to store data about the current state of the chain
+/// `messaging` is used to store data regarding l1 messagings.
+/// `da` is used to store the data availaiblity facts that need to be written to the L1.
+/// `bonsai` is used to store the commitment tries.
 pub struct Backend<B: BlockT> {
     meta: Arc<MetaDb<B>>,
     mapping: Arc<MappingDb<B>>,
     da: Arc<DaDb<B>>,
     messaging: Arc<MessagingDb<B>>,
     sierra_classes: Arc<SierraClassesDb<B>>,
+    bonsai: Arc<BonsaiDb<B>>,
 }
 
 /// Returns the Starknet database directory.
@@ -123,14 +133,17 @@ impl<B: BlockT> Backend<B> {
     }
 
     fn new(config: &DatabaseSettings, cache_more_things: bool) -> Result<Self, String> {
-        let db = db_opening_utils::open_database(config)?;
+        let dbs = db_opening_utils::open_database(config)?;
+        let kvdb: Arc<dyn KeyValueDB> = dbs.0;
+        let spdb: Arc<dyn Database<DbHash>> = dbs.1;
 
         Ok(Self {
-            mapping: Arc::new(MappingDb::new(db.clone(), cache_more_things)),
-            meta: Arc::new(MetaDb { db: db.clone(), _marker: PhantomData }),
-            da: Arc::new(DaDb { db: db.clone(), _marker: PhantomData }),
-            messaging: Arc::new(MessagingDb { db: db.clone(), _marker: PhantomData }),
-            sierra_classes: Arc::new(SierraClassesDb { db: db.clone(), _marker: PhantomData }),
+            mapping: Arc::new(MappingDb::new(spdb.clone(), cache_more_things)),
+            meta: Arc::new(MetaDb { db: spdb.clone(), _marker: PhantomData }),
+            da: Arc::new(DaDb { db: spdb.clone(), _marker: PhantomData }),
+            messaging: Arc::new(MessagingDb { db: spdb.clone(), _marker: PhantomData }),
+            sierra_classes: Arc::new(SierraClassesDb { db: spdb.clone(), _marker: PhantomData }),
+            bonsai: Arc::new(BonsaiDb { db: kvdb.clone(), _marker: PhantomData }),
         })
     }
 
@@ -157,6 +170,11 @@ impl<B: BlockT> Backend<B> {
     /// Return the sierra classes database manager
     pub fn sierra_classes(&self) -> &Arc<SierraClassesDb<B>> {
         &self.sierra_classes
+    }
+
+    /// Return the bonsai database manager
+    pub fn bonsai(&self) -> &Arc<BonsaiDb<B>> {
+        &self.bonsai
     }
 
     /// In the future, we will compute the block global state root asynchronously in the client,
