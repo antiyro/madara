@@ -957,6 +957,9 @@ impl<T: Config> Pallet<T> {
 
         let l1_gas_price = T::L1GasPrice::get();
 
+        let (transaction_commitment, event_commitment) =
+            mp_commitments::calculate_commitments::<T::SystemHash>(&transactions, &events, chain_id);
+
         let block = StarknetBlock::new(
             StarknetHeader::new(
                 parent_block_hash.into(),

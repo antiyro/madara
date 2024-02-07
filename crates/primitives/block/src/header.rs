@@ -26,8 +26,12 @@ pub struct Header {
     pub block_timestamp: u64,
     /// The number of transactions in a block
     pub transaction_count: u128,
-    /// The number of events
-    pub event_count: u128,
+     /// A commitment to the transactions included in the block
+     pub transaction_commitment: StarkHash,
+     /// The number of events
+     pub event_count: u128,
+     /// A commitment to the events produced in this block
+     pub event_commitment: StarkHash,
     /// The version of the Starknet protocol used when creating this block
     pub protocol_version: u8,
     /// l1 gas price for this block
@@ -46,7 +50,9 @@ impl Header {
         sequencer_address: ContractAddress,
         block_timestamp: u64,
         transaction_count: u128,
+        transaction_commitment: StarkHash,
         event_count: u128,
+        event_commitment: StarkHash,
         protocol_version: u8,
         l1_gas_price: ResourcePrice,
         extra_data: Option<U256>,
@@ -57,6 +63,8 @@ impl Header {
             sequencer_address,
             block_timestamp,
             transaction_count,
+            transaction_commitment,
+            event_commitment,
             event_count,
             protocol_version,
             l1_gas_price,
